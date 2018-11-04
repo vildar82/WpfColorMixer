@@ -29,29 +29,20 @@ namespace WpfColorMixer.Mixer
                 .Select(_ => Unit.Default);
             percentObs.Subscribe(s => CalcPercent());
 
-            var mixtureSrc = new SourceList<MixtureItemVM>();
-            var mixtureObs = mixtureSrc.Connect();
-            mixtureObs
-                .ObserveOn(dispatcher)
-                .Bind(out var mixtureCol)
-                .DisposeMany()
-                .Subscribe();
-            Mixture = mixtureCol;
-
             AddComponemt = CreateCommand<MixComponent>(c =>
             {
-                if (mixtureSrc.Items.Any(m => m.Component == c))
+                if (Mixture.Any(m => m.Component == c))
                     return;
                 Components.Remove(c);
                 var item = new MixtureItemVM { Component = c };
                 item.WhenAnyValue(v => v.Percent).Skip(1).Subscribe(s => 
                     percentSubject.OnNext(s));
-                mixtureSrc.Add(item);
+                Mixture.Add(item);
                 CalcPercent();
             });
             DeleteComponent = CreateCommand<MixtureItemVM>(c =>
             {
-                mixtureSrc.Remove(c);
+                Mixture.Remove(c);
                 Components.Add(c.Component);
                 CalcPercent();
             });
@@ -71,7 +62,7 @@ namespace WpfColorMixer.Mixer
         
         public string PaletteName { get; set; }
 
-        public ReadOnlyObservableCollection<MixtureItemVM> Mixture { get; set; }
+        public ObservableCollection<MixtureItemVM> Mixture { get; set; } = new ObservableCollection<MixtureItemVM>();
 
         public ReactiveCommand AddComponemt { get; set; }
 
