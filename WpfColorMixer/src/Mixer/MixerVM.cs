@@ -1,3 +1,5 @@
+using DynamicData.Binding;
+
 namespace WpfColorMixer.Mixer
 {
     using System;
@@ -26,23 +28,32 @@ namespace WpfColorMixer.Mixer
 
             var percentObs = percentSubject.Delay(TimeSpan.FromMilliseconds(300))
                 .Throttle(TimeSpan.FromMilliseconds(300))
+                .ObserveOnDispatcher()
                 .Select(_ => Unit.Default);
             percentObs.Subscribe(s => CalcPercent());
+            
+            var mixtureSrc = new SourceList<MixtureItemVM>();
+            mixtureSrc.Connect()
+                .Sort(SortExpressionComparer<MixtureItemVM>.Descending(i => i.Percent), resort: percentObs)
+                .ObserveOnDispatcher()
+                .Bind(out var mixtureData)
+                .Subscribe();
+            Mixture = mixtureData;
 
             AddComponemt = CreateCommand<MixComponent>(c =>
             {
-                if (Mixture.Any(m => m.Component == c))
+                if (mixtureSrc.Items.Any(m => m.Component == c))
                     return;
                 Components.Remove(c);
                 var item = new MixtureItemVM { Component = c };
                 item.WhenAnyValue(v => v.Percent).Skip(1).Subscribe(s => 
                     percentSubject.OnNext(s));
-                Mixture.Add(item);
+                mixtureSrc.Add(item);
                 CalcPercent();
             });
             DeleteComponent = CreateCommand<MixtureItemVM>(c =>
             {
-                Mixture.Remove(c);
+                mixtureSrc.Remove(c);
                 Components.Add(c.Component);
                 CalcPercent();
             });
@@ -62,7 +73,7 @@ namespace WpfColorMixer.Mixer
         
         public string PaletteName { get; set; }
 
-        public ObservableCollection<MixtureItemVM> Mixture { get; set; } = new ObservableCollection<MixtureItemVM>();
+        public ReadOnlyObservableCollection<MixtureItemVM> Mixture { get; set; }
 
         public ReactiveCommand AddComponemt { get; set; }
 
